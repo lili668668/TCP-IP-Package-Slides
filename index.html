@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>網路封包解析</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/night.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+  <style>
+    :root {
+      --r-main-font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      --r-heading-font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      --r-main-color: #e8e8e8;
+      --r-heading-color: #61dafb;
+      --r-link-color: #61dafb;
+      --r-background-color: #0d1117;
+    }
+
+    .reveal {
+      font-size: 1.6rem;
+    }
+
+    .reveal h1 {
+      font-size: 2.2em;
+      color: #61dafb;
+      text-shadow: 0 0 20px rgba(97, 218, 251, 0.4);
+      border-bottom: 2px solid rgba(97, 218, 251, 0.3);
+      padding-bottom: 0.2em;
+    }
+
+    .reveal h2 {
+      font-size: 1.6em;
+      color: #79c0ff;
+    }
+
+    .reveal h3 {
+      font-size: 1.3em;
+      color: #d2a8ff;
+    }
+
+    .reveal table {
+      font-size: 0.78em;
+      border-collapse: collapse;
+      margin: 0.5em auto;
+    }
+
+    .reveal table th {
+      background: rgba(97, 218, 251, 0.2);
+      color: #61dafb;
+      padding: 0.4em 0.8em;
+      border: 1px solid rgba(97, 218, 251, 0.3);
+    }
+
+    .reveal table td {
+      padding: 0.35em 0.8em;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .reveal table tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .reveal ul {
+      margin-left: 1em;
+    }
+
+    .reveal li {
+      margin: 0.3em 0;
+      line-height: 1.5;
+    }
+
+    .reveal img {
+      max-height: 50vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+      border: none !important;
+    }
+
+    .reveal code {
+      background: rgba(97, 218, 251, 0.1);
+      border-radius: 4px;
+      padding: 0.1em 0.3em;
+      color: #79c0ff;
+    }
+
+    .reveal blockquote {
+      background: rgba(97, 218, 251, 0.08);
+      border-left: 4px solid #61dafb;
+      padding: 0.5em 1em;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .reveal .progress {
+      color: #61dafb;
+    }
+
+    .reveal .controls {
+      color: #61dafb;
+    }
+
+    /* Title slide special styling */
+    .reveal section.title-slide h1 {
+      font-size: 2.8em;
+    }
+
+    /* Highlight boxes */
+    .reveal .highlight-box {
+      background: rgba(97, 218, 251, 0.1);
+      border: 1px solid rgba(97, 218, 251, 0.3);
+      border-radius: 8px;
+      padding: 1em;
+      margin: 0.5em 0;
+    }
+
+    .reveal .warning-box {
+      background: rgba(255, 165, 0, 0.1);
+      border: 1px solid rgba(255, 165, 0, 0.4);
+      border-radius: 8px;
+      padding: 1em;
+      margin: 0.5em 0;
+      color: #ffa500;
+    }
+
+    .slide-number-custom {
+      font-size: 0.8em;
+      color: rgba(255,255,255,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- ===== Title Slide ===== -->
+      <section class="title-slide">
+        <h1>網路封包解析</h1>
+        <p style="color: #79c0ff; margin-top: 1em;">IP · ARP · DNS · ICMP · TCP · UDP · QUIC</p>
+        <p style="color: rgba(255,255,255,0.4); font-size: 0.7em; margin-top: 2em;">按 → 繼續，↓ 看子頁面</p>
+      </section>
+
+      <!-- ===== IP 協定的主要兩個功能 ===== -->
+      <section>
+        <section>
+          <h1>IP 協定的主要兩個功能</h1>
+          <ul>
+            <li class="fragment">功能一：裝箱</li>
+            <li class="fragment">功能二：找路</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>功能一：裝箱</h2>
+          <p>需要看 <strong>MTU</strong>（Maximum Transmission Unit 最大傳輸單位）</p>
+          <p style="font-size:0.8em; color: rgba(255,255,255,0.6);">每個 Data layer 可處理的最大傳輸單位是不同的</p>
+          <table>
+            <thead>
+              <tr><th>網路型態</th><th>MTU</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Ethernet</td><td>1,500 Bytes</td></tr>
+              <tr><td>X.25</td><td>1,600 Bytes</td></tr>
+              <tr><td>FDDI</td><td>576 Bytes</td></tr>
+              <tr><td>ATM</td><td>9,180 Bytes</td></tr>
+              <tr><td>Token Ring (16 Mbps)</td><td>17,914 Bytes</td></tr>
+              <tr><td>Token Ring (4 Mbps)</td><td>4,464 Bytes</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2>功能二：找路</h2>
+          <img src="https://hackmd.io/_uploads/rJzClCLyfe.png" alt="找路示意圖" />
+        </section>
+      </section>
+
+      <!-- ===== IP 封包 ===== -->
+      <section>
+        <section>
+          <h1>IP 封包（IP Package）</h1>
+          <img src="https://hackmd.io/_uploads/rJJXyaLyzg.png" alt="IP 封包結構" />
+          <ul>
+            <li><strong>IP 表頭</strong> → 投遞貨物的資料</li>
+            <li><strong>IP Payload</strong> → 貨物</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>IPv4 表頭</h2>
+          <ul>
+            <li class="fragment"><strong>Version</strong></li>
+            <li class="fragment"><strong>Header Length</strong></li>
+            <li class="fragment"><strong>Differentiated Services Field</strong> → 封包怎麼處理</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>Differentiated Services Field</h3>
+          <p><strong>DSCP</strong> → 優先級</p>
+          <table style="font-size:0.65em;">
+            <thead>
+              <tr><th>DSCP 名稱</th><th>數值</th><th>用途</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CS0 (Default)</td><td>0</td><td>一般流量，無優先級</td></tr>
+              <tr><td>CS1</td><td>8</td><td>低優先級（背景流量）</td></tr>
+              <tr><td>AF11~AF43</td><td>各種</td><td>一般商務應用，分等級保證</td></tr>
+              <tr><td>EF (Expedited Forwarding)</td><td>46</td><td>即時通訊（VoIP 電話、視訊會議）</td></tr>
+              <tr><td>CS6</td><td>48</td><td>網路控制協定</td></tr>
+              <tr><td>CS7</td><td>56</td><td>最高優先級（保留給網路自己用）</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h3>ECN → 路上有沒有塞車</h3>
+          <table>
+            <thead>
+              <tr><th>ECN 值</th><th>名稱</th><th>意思</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>00</td><td>Not-ECT</td><td>這個封包不支援 ECN</td></tr>
+              <tr><td>10</td><td>ECT(0)</td><td>支援 ECN（傳輸層標記法 0）</td></tr>
+              <tr><td>01</td><td>ECT(1)</td><td>支援 ECN（傳輸層標記法 1）</td></tr>
+              <tr><td>11</td><td>CE</td><td>路由器標的：我這裡塞車了！</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2>IPv4 表頭（續）</h2>
+          <ul style="font-size:0.85em;">
+            <li class="fragment"><strong>Total Length</strong> → IPv4 封包總長度</li>
+            <li class="fragment"><strong>Identification</strong> → 封包識別 ID（分片重組用）</li>
+            <li class="fragment"><strong>Flags</strong>：Reserved bit / Don't fragment / More fragments</li>
+            <li class="fragment"><strong>Fragment Offset</strong> → 偏移量</li>
+            <li class="fragment"><strong>Time to Live (TTL)</strong> → 每過一個路由減一，歸零即丟棄</li>
+            <li class="fragment"><strong>Protocol</strong> → 協議（UDP / TCP）</li>
+            <li class="fragment"><strong>Header Checksum</strong> → 校驗碼（IPv6 已移除）</li>
+            <li class="fragment"><strong>Source / Destination Address</strong></li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ===== IPv6 表頭 ===== -->
+      <section>
+        <h1>IPv6 表頭</h1>
+        <ul>
+          <li class="fragment"><strong>Version</strong></li>
+          <li class="fragment"><strong>Traffic Class</strong> → 同 IPv4 的 Differentiated Services Field</li>
+          <li class="fragment"><strong>Payload Length</strong> → 資料長度（不含表頭）</li>
+          <li class="fragment"><strong>Next Header</strong> → 下一個協議</li>
+          <li class="fragment"><strong>Hop Limit</strong> → 同 IPv4 的 TTL</li>
+          <li class="fragment"><strong>Source / Destination Address</strong></li>
+          <li class="fragment" style="color:#ffa500;">✓ Checksum 消失了 owo</li>
+        </ul>
+      </section>
+
+      <!-- ===== ARP ===== -->
+      <section>
+        <section>
+          <h1>ARP 協議</h1>
+          <p>Address Resolution Protocol</p>
+          <div class="highlight-box" style="margin-top:1em; text-align:center; font-size:1.2em;">
+            IP → MAC 地址 的轉換協議
+          </div>
+        </section>
+
+        <section>
+          <h2>ARP 封包</h2>
+          <ul style="font-size:0.85em;">
+            <li class="fragment"><strong>Hardware type</strong> → 網路技術</li>
+            <li class="fragment"><strong>Protocol type</strong> → 協議</li>
+            <li class="fragment"><strong>Hardware size</strong> → MAC address 的長度</li>
+            <li class="fragment"><strong>Protocol size</strong> → IP address 的長度</li>
+            <li class="fragment"><strong>Opcode</strong> → 執行代碼</li>
+            <li class="fragment"><strong>Sender MAC address</strong> → 傳送者的 MAC address</li>
+            <li class="fragment"><strong>Sender IP address</strong> → 傳送者的 IP address</li>
+            <li class="fragment"><strong>Target MAC address</strong> → 接收者的 MAC address</li>
+            <li class="fragment"><strong>Target IP address</strong> → 接收者的 IP address</li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ===== DNS 封包 ===== -->
+      <section>
+        <section>
+          <h1>DNS 封包</h1>
+          <ul>
+            <li class="fragment"><strong>Transaction ID</strong></li>
+            <li class="fragment"><strong>Flags</strong></li>
+            <li class="fragment"><strong>Questions</strong> → 問題數</li>
+            <li class="fragment"><strong>Answer RRs</strong> → 有幾筆回答</li>
+            <li class="fragment"><strong>Authority RRs</strong> → 有幾個 NS 有這個記錄</li>
+            <li class="fragment"><strong>Additional RRs</strong> → 額外的答案</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>有發現一件事嗎？</h2>
+          <div class="fragment warning-box" style="text-align:center; font-size:1.3em; margin-top:1em;">
+            ARP 跟 DNS 封包<strong>沒有加密</strong> (° ∀ °)
+          </div>
+          <div class="fragment" style="text-align:center; font-size:1.5em; margin-top:1em; color:#ff6b6b;">
+            沒加密 = 可攻擊
+          </div>
+        </section>
+
+        <section>
+          <h2>DNS 汙染</h2>
+          <div style="font-size:0.85em; line-height:2;">
+            <p class="fragment">
+              <span style="color:#61dafb;">[A]</span> google.com IP 是什麼？
+              →
+              <span style="color:#ffa500;">[中間人]</span> google.com IP 是什麼？
+              →
+              <span style="color:#79c0ff;">[DNS Server]</span>
+            </p>
+            <p class="fragment">
+              <span style="color:#61dafb;">[A]</span>
+              ← google.com IP 是 <span style="color:#ff6b6b;">8.87.87.2</span>
+              <span style="color:#ffa500;">[中間人]</span>
+              ← google.com IP 是 <span style="color:#79c0ff;">3.12.45.7</span>
+              <span style="color:#79c0ff;">[DNS Server]</span>
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2>DNS over TLS</h2>
+          <div class="highlight-box" style="text-align:center; font-size:1.1em;">
+            讓 DNS 經過 TCP 連線，且<strong>加密</strong>
+          </div>
+        </section>
+      </section>
+
+      <!-- ===== ARP 攻擊防範 ===== -->
+      <section>
+        <h1>ARP 攻擊防範</h1>
+        <ul style="font-size:0.82em;">
+          <li class="fragment">
+            <strong>Dynamic ARP Inspection</strong>
+            → 監聽 DHCP 的交握流程，確保每個 ARP 封包資料正確
+          </li>
+          <li class="fragment">
+            <strong>Private VLAN</strong>
+            → 一個裝置一個虛擬區網，獨立隔離
+          </li>
+          <li class="fragment">
+            <strong>802.1X 連線認證</strong>
+            → 認證連入區網的使用者
+          </li>
+          <li class="fragment">
+            <strong>換掉 ARP</strong>
+            → IPv6 使用 <strong>NDP 協議</strong>（ARP + ICMP）
+            <ul>
+              <li>可搭配 <strong>SEND</strong>（加密版 NDP）</li>
+              <li>實務上多用 <strong>RA Guard</strong>（類似 DAI 概念）</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ===== ICMP ===== -->
+      <section>
+        <h1>ICMP 協議</h1>
+        <p style="color: rgba(255,255,255,0.7);">用來做網路診斷的 debug 協議</p>
+        <ul style="margin-top:0.8em;">
+          <li class="fragment"><strong>Type</strong></li>
+          <li class="fragment"><strong>Code</strong> → Type 的結果代碼（同 Type 不同 Code，意義不同）</li>
+          <li class="fragment"><strong>Identifier</strong> → ID（可能同時執行多個 ping）</li>
+          <li class="fragment"><strong>Sequence Number</strong> → 每個封包的 ID</li>
+          <li class="fragment"><strong>Data</strong> → 前面是時間戳，後面是填充資料</li>
+        </ul>
+      </section>
+
+      <!-- ===== TCP ===== -->
+      <section>
+        <section>
+          <h1>TCP 協議</h1>
+          <h2 style="margin-top:0.5em;">三方交握</h2>
+          <ul style="list-style:none; text-align:center; font-size:1.1em;">
+            <li class="fragment">🤝 <strong>[SYN]</strong>：來，握手</li>
+            <li class="fragment">🤝 <strong>[SYN, ACK]</strong>：好，握手</li>
+            <li class="fragment">🤝 <strong>[ACK]</strong>：好，我們握手了</li>
+          </ul>
+        </section>
+
+        <section>
+          <img src="https://hackmd.io/_uploads/BkLW-InxGe.jpg" alt="TCP 三方交握示意圖" />
+        </section>
+
+        <section>
+          <h2>TCP 封包的其他部分</h2>
+          <ul>
+            <li class="fragment">
+              <strong>[ECE]</strong>：路上有壅塞了，請降速
+            </li>
+            <li class="fragment">
+              <strong>[CWR]</strong>：收到，我已經降速了
+            </li>
+            <li class="fragment">
+              <strong>[PSH]</strong>：現在立刻給我資料
+            </li>
+            <li class="fragment">
+              <strong>Window Size</strong>
+              → 告訴對方我現在腹地有多大，你可以送多大的封包過來
+            </li>
+            <li class="fragment">
+              <strong>Options</strong> → 一堆參數
+            </li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ===== UDP ===== -->
+      <section>
+        <section>
+          <h1>UDP 協議</h1>
+          <div class="highlight-box" style="text-align:center; font-size:1.1em; margin-top:1em;">
+            一個只負責發訊息，<strong>沒有要管訊息有沒有到</strong>的協議
+          </div>
+          <p class="fragment" style="margin-top:1em; color: rgba(255,255,255,0.6);">
+            因為沒什麼好講的，所以我們來講講它的其他應用
+          </p>
+        </section>
+
+        <section>
+          <h2>DNS 協議</h2>
+          <p>又回來了 owo</p>
+          <div class="highlight-box" style="margin-top:1em;">
+            DNS 協議是基於 <strong>UDP</strong> 去傳輸的
+          </div>
+        </section>
+        <section>
+          <h1>QUIC</h1>
+          <p style="font-size:0.9em; color: rgba(255,255,255,0.7);">Quick UDP Internet Connection</p>
+          <p style="font-size:0.9em; color: rgba(255,255,255,0.7);">好快快 UDP</p>
+          <ul style="margin-top:1em;">
+            <li class="fragment">我大 Google 提出的協議</li>
+            <li class="fragment">加密協議，資料穿好衣服</li>
+            <li class="fragment">基於 UDP，兼具速度與安全</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>QUIC 三方交握</h2>
+          <img src="https://hackmd.io/_uploads/ByOZaH2eGe.jpg" alt="QUIC 三方交握示意圖" />
+        </section>
+      </section>
+
+      <!-- ===== 補充：MACsec ===== -->
+      <section>
+        <h1>補充：MACsec</h1>
+        <ul>
+          <li class="fragment">網路<strong>第二層</strong>（Data Link Layer）的連線加密防護</li>
+          <li class="fragment">做在第二層 → <strong>硬體層級</strong>的加密</li>
+          <li class="fragment">一般家用電腦無法使用</li>
+          <li class="fragment">通常用於<strong>資料中心</strong>或<strong>企業網路</strong></li>
+        </ul>
+      </section>
+
+      <!-- ===== 補充：HTTP 封包 ===== -->
+      <section>
+        <h1>補充：HTTP 封包</h1>
+        <ul style="font-size:0.85em;">
+          <li class="fragment">其實應用層封包不在範圍內…</li>
+          <li class="fragment">但都拆了 DNS 封包了，HTTP 也拆一下吧</li>
+          <li class="fragment">
+            看這裡：
+            <a href="https://httpforever.com/" target="_blank">https://httpforever.com/</a>
+          </li>
+          <li class="fragment">我們來看看他裸奔的資料吧 👀</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: 'c/t',
+      transition: 'slide',
+      transitionSpeed: 'fast',
+      controls: true,
+      progress: true,
+      center: true,
+      plugins: [RevealHighlight, RevealNotes],
+      width: 1100,
+      height: 700,
+      margin: 0.08,
+    });
+  </script>
+</body>
+</html>
